@@ -1,21 +1,19 @@
 import logging
 from typing import Any
-
+import time
 from base import Worker
 from constants import FNAME
 from mrds import MyRedis
 from constants import IN, N_WORKERS, COUNT
 import pandas as pd
-# from tqdm import tqdm
 
 class WcWorker(Worker):
 
   def run(self, **kwargs: Any) -> None:
     rds: MyRedis = kwargs['rds']
-
-    path, res = rds.get_file(self.GROUP, self.name, IN)
+    
+    path, res, id = rds.get_file(self.GROUP, self.name, IN)
     while res:
-      logging.info(f"Worker started on path {path}")
       count_dict = {}
       tweets = pd.read_csv(path, lineterminator='\n')
       tweets["text"] = tweets["text"].astype(str)
@@ -27,8 +25,9 @@ class WcWorker(Worker):
             if word not in count_dict:
                 count_dict[word] = 0
             count_dict[word] = count_dict[word] + 1
+
+      rds.update_cnt(count_dict, id, IN, self.GROUP)
+      path, res, id = rds.get_file(self.GROUP, self.name, IN)
+
+    
       
-      for word, cnt in count_dict.items():
-        rds.update_cnt(cnt, word)
-      logging.info("Counting Done")
-      path, res = rds.get_file(self.GROUP, self.name, IN)
